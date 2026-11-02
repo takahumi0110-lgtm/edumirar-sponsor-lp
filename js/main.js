@@ -297,12 +297,16 @@
     if (supportsDialog) {
       try {
         modal.showModal();
-        return;
       } catch (err) {
         supportsDialog = false;
+        modal.setAttribute('open', '');
       }
+    } else {
+      modal.setAttribute('open', '');
     }
-    modal.setAttribute('open', '');
+    // APIはあっても「最前面(top layer)」表示が効かない環境がある(一部のアプリ内
+    // ブラウザ等)ため、ネイティブ表示の成否に関わらず、常に明示的な中央固定表示
+    // を重ねて適用する。通常のSafari/Chromeでは見た目に影響しない(保険)
     modal.classList.add('is-fallback-open');
     getFallbackBackdrop().hidden = false;
   }
@@ -357,13 +361,13 @@
   }
 
   function closeSponsorModal() {
+    modal.classList.remove('is-fallback-open');
+    if (fallbackBackdrop) { fallbackBackdrop.hidden = true; }
     if (supportsDialog && modal.open) {
-      modal.close();
+      modal.close(); // 'close'イベント経由でfinishClose()が呼ばれる
       return;
     }
     modal.removeAttribute('open');
-    modal.classList.remove('is-fallback-open');
-    if (fallbackBackdrop) { fallbackBackdrop.hidden = true; }
     finishClose();
   }
 
