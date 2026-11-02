@@ -13,7 +13,10 @@
   'use strict';
 
   var SHEET_ID = '12RhShP7x0BfDBXz5JyIdeTrtbYAjFTvXohjC0PU5X_s';
-  var SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/export?format=csv&gid=0';
+  // gidを指定しない(=スプレッドシートの最初のシートを自動的に取得する)。
+  // 以前はgid=0を固定指定していたが、このシートの実際のgidが0ではないため
+  // 常に取得エラーとなり、編集内容が反映されない不具合があった。
+  var SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/export?format=csv';
 
   // 取得に失敗した場合の最終手段(作成時点のデータのスナップショット)
   var FALLBACK_ROWS = [
