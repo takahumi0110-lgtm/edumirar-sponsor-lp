@@ -275,41 +275,96 @@
     }
   }
 
-  function openSponsorModal(data) {
-    buildGallery(data.images, data.name);
+  // 古いiOS Safari・一部アプリ内ブラウザ(LINE/Instagram等)では<dialog>のshowModal()が
+  // 使えない、あるいは実行時に例外を投げることがある。その場合はopen属性+自作の背景幕で
+  // 代替表示する(フォーカストラップ等のネイティブ機能は失うが、タップしても何も起きない
+  // 状態にはならない)。
+  var supportsDialog = typeof HTMLDialogElement === 'function' && typeof modal.showModal === 'function';
+  var fallbackBackdrop = null;
 
-    els.tier.textContent = data.tierLabel || data.groupLabel || '';
-    els.name.textContent = data.name;
-    fillText(els.address, data.address ? '所在地: ' + data.address : null, null);
-    fillText(els.desc, data.description, null);
-    fillText(els.benefit, data.benefit, null);
-
-    els.links.innerHTML = '';
-    var hasLink = false;
-    linkDefs.forEach(function (def) {
-      var url = data[def.key];
-      if (!url) { return; }
-      hasLink = true;
-      var a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.className = 'sponsor-modal__link';
-      a.textContent = def.label || data.websiteLabel || '公式サイト';
-      els.links.appendChild(a);
-    });
-    if (!hasLink) {
-      els.links.appendChild(el('p', 'sponsor-modal__links-empty', 'リンク情報は準備中です'));
+  function getFallbackBackdrop() {
+    if (!fallbackBackdrop) {
+      fallbackBackdrop = document.createElement('div');
+      fallbackBackdrop.className = 'sponsor-modal-backdrop';
+      fallbackBackdrop.hidden = true;
+      fallbackBackdrop.addEventListener('click', closeSponsorModal);
+      document.body.appendChild(fallbackBackdrop);
     }
+    return fallbackBackdrop;
+  }
 
-    lastFocused = document.activeElement;
-    modal.showModal();
-    document.body.classList.add('modal-open');
-    closeBtn.focus();
+  function showModalElement() {
+    if (supportsDialog) {
+      try {
+        modal.showModal();
+        return;
+      } catch (err) {
+        supportsDialog = false;
+      }
+    }
+    modal.setAttribute('open', '');
+    modal.classList.add('is-fallback-open');
+    getFallbackBackdrop().hidden = false;
+  }
+
+  function finishClose() {
+    document.body.classList.remove('modal-open');
+    if (galleryObserver) {
+      galleryObserver.disconnect();
+      galleryObserver = null;
+    }
+    if (lastFocused && typeof lastFocused.focus === 'function') {
+      lastFocused.focus();
+    }
+  }
+
+  function openSponsorModal(data) {
+    try {
+      buildGallery(data.images, data.name);
+
+      els.tier.textContent = data.tierLabel || data.groupLabel || '';
+      els.name.textContent = data.name;
+      fillText(els.address, data.address ? '所在地: ' + data.address : null, null);
+      fillText(els.desc, data.description, null);
+      fillText(els.benefit, data.benefit, null);
+
+      els.links.innerHTML = '';
+      var hasLink = false;
+      linkDefs.forEach(function (def) {
+        var url = data[def.key];
+        if (!url) { return; }
+        hasLink = true;
+        var a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.className = 'sponsor-modal__link';
+        a.textContent = def.label || data.websiteLabel || '公式サイト';
+        els.links.appendChild(a);
+      });
+      if (!hasLink) {
+        els.links.appendChild(el('p', 'sponsor-modal__links-empty', 'リンク情報は準備中です'));
+      }
+
+      lastFocused = document.activeElement;
+      showModalElement();
+      document.body.classList.add('modal-open');
+      closeBtn.focus();
+    } catch (err) {
+      // 想定外のエラーでもページ全体を壊さない
+      window.console && console.error && console.error('sponsor modal error', err);
+    }
   }
 
   function closeSponsorModal() {
-    modal.close();
+    if (supportsDialog && modal.open) {
+      modal.close();
+      return;
+    }
+    modal.removeAttribute('open');
+    modal.classList.remove('is-fallback-open');
+    if (fallbackBackdrop) { fallbackBackdrop.hidden = true; }
+    finishClose();
   }
 
   closeBtn.addEventListener('click', closeSponsorModal);
@@ -326,16 +381,7 @@
     if (e.key === 'ArrowRight') { shiftSlide(1); }
   });
 
-  modal.addEventListener('close', function () {
-    document.body.classList.remove('modal-open');
-    if (galleryObserver) {
-      galleryObserver.disconnect();
-      galleryObserver = null;
-    }
-    if (lastFocused && typeof lastFocused.focus === 'function') {
-      lastFocused.focus();
-    }
-  });
+  modal.addEventListener('close', finishClose);
 
   window.loadSponsors().then(function (result) {
     var sponsors = result.sponsors;
